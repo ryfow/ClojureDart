@@ -2561,36 +2561,37 @@
                                            :dart/type (new-dart-type mclass-name type-params dart-fields env)
                                            :type :class}))
         dart-type (new-dart-type mclass-name type-params dart-fields parsed-class-specs env)
-        _ (swap! nses do-def class-name {:dart/name mclass-name :dart/type dart-type :type :class})
-        class (emit-class-specs class-name parsed-class-specs env)
-        dart-super-type (:extends class) ; should never
-        meth (-> class :super-ctor :method)
-        super-ctor-meth (cond-> (:element-name dart-super-type) meth (str "." meth))
-        super-ctor-info (some-> (dart-member-lookup dart-super-type super-ctor-meth env) actual-member)
-        _ (when (not super-ctor-info)
-            (binding [*out* *err*]
-              (println "DYNAMIC WARNING: can't resolve constructor " super-ctor-meth "for type" (:element-name dart-super-type "dynamic") "of library" (:lib dart-super-type "dart:core") (source-info))))
-        super-ctor-split-args+types
-        (-> class :super-ctor :args (split-args (some-> super-ctor-info dart-method-sig) env))
+        _ (swap! nses do-def class-name {:dart/name mclass-name :dart/type dart-type :type :class})]
+    (binding [*class-prefix* (name mclass-name)]
+      (let [class (emit-class-specs class-name parsed-class-specs env)
+            dart-super-type (:extends class) ; should never
+            meth (-> class :super-ctor :method)
+            super-ctor-meth (cond-> (:element-name dart-super-type) meth (str "." meth))
+            super-ctor-info (some-> (dart-member-lookup dart-super-type super-ctor-meth env) actual-member)
+            _ (when (not super-ctor-info)
+                (binding [*out* *err*]
+                  (println "DYNAMIC WARNING: can't resolve constructor " super-ctor-meth "for type" (:element-name dart-super-type "dynamic") "of library" (:lib dart-super-type "dart:core") (source-info))))
+            super-ctor-split-args+types
+            (-> class :super-ctor :args (split-args (some-> super-ctor-info dart-method-sig) env))
 
-        const (and (:const super-ctor-info) (not-any? #(:dart/mutable (meta %)) dart-fields)) ; TODO it's weak we should test super args for const while assuming params to be const
-        dart-type (cond-> dart-type const (assoc-in [(name mclass-name) :const] true))
-        class (-> class
-                  (assoc :name dart-type
-                         :ctor mclass-name
-                         :abstract abstract
-                         :fields dart-fields
-                         :ctor-params (map #(list '. %) dart-fields))
-                  (assoc-in [:super-ctor :args]
-                            (into []
-                                  (mapcat
-                                   (fn [[name arg]]
-                                     (if (nil? name)
-                                       (-> arg (ensure-dart-expr env) list)
-                                       [name (-> arg (ensure-dart-expr env))])))
-                                  super-ctor-split-args+types)))]
-    (swap! nses alter-def class-name assoc :dart/code (with-dart-str (write-class class)) :dart/type dart-type)
-    (emit class-name env)))
+            const (and (:const super-ctor-info) (not-any? #(:dart/mutable (meta %)) dart-fields)) ; TODO it's weak we should test super args for const while assuming params to be const
+            dart-type (cond-> dart-type const (assoc-in [(name mclass-name) :const] true))
+            class (-> class
+                    (assoc :name dart-type
+                      :ctor mclass-name
+                      :abstract abstract
+                      :fields dart-fields
+                      :ctor-params (map #(list '. %) dart-fields))
+                    (assoc-in [:super-ctor :args]
+                      (into []
+                        (mapcat
+                          (fn [[name arg]]
+                            (if (nil? name)
+                              (-> arg (ensure-dart-expr env) list)
+                              [name (-> arg (ensure-dart-expr env))])))
+                        super-ctor-split-args+types)))]
+        (swap! nses alter-def class-name assoc :dart/code (with-dart-str (write-class class)) :dart/type dart-type)
+        (emit class-name env)))))
 
 (defn emit-extend-type-protocol* [[_ class-name protocol-ns protocol-name extension-instance] env]
   (let [{:keys [current-ns] {proto-map protocol-name} protocol-ns}
