@@ -89,7 +89,7 @@ More details [there](doc/flutter-quick-start.md)
 
 # Maturity
 
-ClojureDart is a work-in-progress but it's good enough for the bravest Clojurists to put in in production. Learn more about [what's going on.](NEWS.md)
+ClojureDart is a work-in-progress but it's good enough for the bravest Clojurists to put it in production. Learn more about [what's going on.](NEWS.md)
 
 # Who is behind it?
 
